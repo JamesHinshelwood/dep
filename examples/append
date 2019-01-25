@@ -1,0 +1,17 @@
+A : *;
+Nat : *;
+zero : Nat;
+succ : Nat -> Nat;
+plus : Nat -> Nat -> Nat;
+Vector : * -> Nat -> *;
+nil : (a : *) -> Vector a zero;
+cons : (a : *) -> (n : Nat) -> a -> (Vector a n) -> (Vector a (succ n));
+append : (a : *) -> (m : Nat) -> (n : Nat) -> (Vector a m) -> (Vector a n) -> (Vector a (plus m n));
+one = succ zero;
+two = succ one;
+mkone = \x:A . cons A zero x (nil A);
+mktwo = \x:A . \y:A . cons A one y (cons A zero x (nil A));
+t : A; u : A; v : A;
+first = mkone t;
+second = mktwo u v;
+append A one two first second

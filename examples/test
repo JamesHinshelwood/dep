@@ -1,0 +1,12 @@
+A : *;
+Nat : *;
+zero : Nat;
+succ : Nat -> Nat;
+Vector : * -> Nat -> *;
+nil : (a : *) -> Vector a zero;
+cons : (a : *) -> (n : Nat) -> a -> Vector a n -> Vector a (succ n);
+one = succ zero;
+two = succ one;
+mkthree = \x:A . \y:A . \z:A . cons A two z (cons A one y (cons A zero x (nil A)));
+t : A;u : A;v : A;
+mkthree t u v
