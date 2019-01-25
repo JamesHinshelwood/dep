@@ -8,7 +8,6 @@ copyright:           "2019 Author name here"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
 - src/Lexer.x
 - src/Parser.y
 
