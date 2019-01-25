@@ -1,13 +1,13 @@
 {
 module Parser (
-    parseProg
+    parseTerm
 ) where
 
 import Syntax
 import Lexer
 }
 
-%name prog Prog
+%name term Term
 %tokentype { Token }
 %error { parseError }
 
@@ -21,26 +21,21 @@ import Lexer
     ')'     { TRParen }
     '->'    { TArrow }
     '='     { TEquals }
-    ';'     { TSemicolon }
+    'let'   { TLet }
+    'in'    { TIn }
     var     { TVar $$ }
 
 %right '->'
 
 %%
 
-Prog : Decl ';' Prog                    { DSeq $1 $3 }
-     | Bind ';' Prog                    { BSeq $1 $3 }
-     | Term                             { Tm $1 }
-
-Bind : var '=' Term                     { ($1, $3) }
-
-Decl : var ':' Term                     { ($1, $3) }
-
 Term : Sort                             { Srt $1 }
      | '\\' var ':' Term '.' Term       { Lam $2 $4 $6 }
      | '(' var ':' Term ')' '->' Term   { Pi $2 $4 $7 }
      | Term '->' Term                   { Pi "_" $1 $3 }
      | Fact                             { $1 }
+     | 'let' var '=' Term 'in' Term     { Let $2 $4 $6 }
+     | 'let' var ':' Term 'in' Term     { Decl $2 $4 $6 }
 
 Fact : Fact Atom                        { App $1 $2 }
      | Atom                             { $1 }
@@ -55,6 +50,6 @@ Sort : '*'                              { Star }
 parseError :: [Token] -> a
 parseError _ = error "Parse error"
 
-parseProg :: String -> Prog
-parseProg = prog . scanTokens
+parseTerm :: String -> Term
+parseTerm = term . scanTokens
 }

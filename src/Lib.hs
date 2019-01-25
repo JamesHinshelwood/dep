@@ -13,8 +13,11 @@ import Data.Either
 repl :: IO ()
 repl = do
   input <- getContents
-  let prog = parseProg input
-  case typeOf [] [] prog of
+  let term = parseTerm input
+  case typeOf [] term of
     Left err -> putStrLn $ show err
-    Right ty -> putStrLn $ show ty
+    Right ty -> do
+      putStrLn $ show term
+      putStrLn "has type"
+      putStrLn $ show ty
   repl

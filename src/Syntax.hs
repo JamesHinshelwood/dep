@@ -4,21 +4,14 @@ import Data.List
 
 type Sym = String
 
-data Prog
-  = DSeq Decl Prog
-  | BSeq Bind Prog
-  | Tm Term
-  deriving (Show)
-
-type Decl = (Sym, Term)
-type Bind = (Sym, Term)
-
 data Term
   = Srt Sort
   | Var Sym
   | Lam Sym Term Term
   | App Term Term
   | Pi Sym Term Term
+  | Let Sym Term Term
+  | Decl Sym Term Term
   deriving (Eq)
 
 instance Show Term where
@@ -30,6 +23,8 @@ instance Show Term where
   show (Pi x t1 t2) = if x `elem` (freeVars t2)
                         then "(" ++ x ++ " : " ++ show t1 ++ ") -> " ++ show t2
                         else show t1 ++ " -> " ++ show t2
+  show (Let x t1 t2) = show t2
+  show (Decl x t1 t2) = show t2
 
 freeVars :: Term -> [Sym]
 freeVars (Srt _) = []

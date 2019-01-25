@@ -25,7 +25,8 @@ tokens :-
     \)                              { \s -> TRParen }
     "->"                            { \s -> TArrow }
     \=                              { \s -> TEquals }
-    \;                              { \s -> TSemicolon }
+    "let"                           { \s -> TLet }
+    "in"                            { \s -> TIn }
     $alpha [$alpha $digit \_ \']*   { \s -> TVar s }
 
 {
@@ -38,7 +39,8 @@ data Token = TStar
            | TRParen
            | TArrow
            | TEquals
-           | TSemicolon
+           | TLet
+           | TIn
            | TVar String
            deriving (Eq, Show)
 
