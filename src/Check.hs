@@ -1,5 +1,6 @@
 module Check where
 
+import Control.Applicative
 import Data.Maybe
 import Syntax
 
@@ -27,8 +28,7 @@ addTerm x tm g = (TermBinding x tm) : g
 
 data TypeError = BoxUntyped
                | VarUnbound Sym
-               | LambdaInner TypeError
-               | LambdaType TypeError
+               | LambdaErr TypeError
                | AppRhsType Term Term
                | AppRhsErr TypeError
                | AppLhsNotLambda Term
@@ -52,23 +52,21 @@ data TypeError = BoxUntyped
                | CaseType TypeError
                deriving (Show)
 
+left :: (a -> b) -> Either a c -> Either b c
+left f (Left x) = Left (f x)
+left _ (Right x) = Right x
+
 rules :: [(Sort, Sort)]
 rules = [(Star, Star), (Star, Box), (Box, Star), (Box, Box)]
 
 typeOf :: Context -> Term -> Either TypeError Term
 typeOf _ (Srt Star) = Right (Srt Box)
 typeOf _ (Srt Box) = Left BoxUntyped
-typeOf g (Var x) = case lookupType x g of
-                          Just ty -> Right ty
-                          Nothing ->
-                            case lookupTerm x g of
-                              Just tm -> Right tm
-                              Nothing -> Left $ VarUnbound x
-typeOf g (Lam x ty tm) = case typeOf g ty of
-                          Right _ -> case typeOf (addType x ty g) tm of
-                                      Right tmTy -> Right $ Pi x ty tmTy
-                                      Left err -> Left $ LambdaInner err
-                          Left err -> Left $ LambdaType err
+typeOf g (Var x) = maybe (Left $ VarUnbound x) Right (lookupType x g <|> lookupTerm x g)
+typeOf g (Lam x ty tm) = left LambdaErr $ do
+  typeOf g ty
+  tmTy <- typeOf (addType x ty g) tm
+  return $ Pi x ty tmTy
 typeOf g (App lhs rhs) = let lhsTy = typeOf g lhs in
                          case lhsTy of
                           Right (Pi x lTy rTy) -> case typeOf g rhs of

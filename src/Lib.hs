@@ -7,7 +7,6 @@ import Check
 import Parser
 
 import Control.Monad
-import Text.Megaparsec
 import Data.Either
 
 repl :: IO ()
