@@ -1,16 +1,3 @@
 let A : * in
 let Nat : * in
-let zero : Nat in
-let succ : Nat -> Nat in
-let plus : Nat -> Nat -> Nat in
-let Vector : * -> Nat -> * in
-let nil : (a : *) -> Vector a zero in
-let cons : (a : *) -> (n : Nat) -> a -> (Vector a n) -> (Vector a (succ n)) in
-let append : (a : *) -> (m : Nat) -> (n : Nat) -> (Vector a m) -> (Vector a n) -> (Vector a (plus m n)) in
-let one = succ zero in
-let two = succ one in
-let mkthree = \x:A . \y:A . \z:A . cons A two z (cons A one y (cons A zero x (nil A))) in
-let t : A in
-let u : A in
-let v : A in
-mkthree
+{ A , Nat }

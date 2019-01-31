@@ -3,8 +3,6 @@ module Lexer (
     scanTokens,
     Token(..)
 ) where
-
-import Syntax
 }
 
 %wrapper "basic"
@@ -25,6 +23,16 @@ tokens :-
     \)                              { \s -> TRParen }
     "->"                            { \s -> TArrow }
     \=                              { \s -> TEquals }
+    \,                              { \s -> TComma }
+    "×"                             { \s -> TProduct }
+    ".1"                            { \s -> TFirst }
+    ".2"                            { \s -> TSecond }
+    "inl"                           { \s -> TInL }
+    "inr"                           { \s -> TInR }
+    \+                              { \s -> TSum }
+    \|                              { \s -> TBar }
+    "case"                          { \s -> TCase }
+    "of"                            { \s -> TOf }
     "let"                           { \s -> TLet }
     "in"                            { \s -> TIn }
     $alpha [$alpha $digit \_ \']*   { \s -> TVar s }
@@ -39,6 +47,16 @@ data Token = TStar
            | TRParen
            | TArrow
            | TEquals
+           | TComma
+           | TProduct
+           | TFirst
+           | TSecond
+           | TInL
+           | TInR
+           | TSum
+           | TBar
+           | TCase
+           | TOf
            | TLet
            | TIn
            | TVar String

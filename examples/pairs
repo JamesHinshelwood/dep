@@ -1,0 +1,4 @@
+let A : * in
+let x : A in
+let y : A in
+((y, (A×A)),(x, x))
