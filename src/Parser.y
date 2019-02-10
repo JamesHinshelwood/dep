@@ -12,28 +12,33 @@ import Lexer
 %error { parseError }
 
 %token
-    '*'     { TStar }
-    '[]'    { TBox }
-    ':'     { TColon }
-    '\\'    { TLambda }
-    '.'     { TDot }
-    '('     { TLParen }
-    ')'     { TRParen }
-    '->'    { TArrow }
-    '='     { TEquals }
-    ','     { TComma }
-    '×'     { TProduct }
-    '.1'    { TFirst }
-    '.2'    { TSecond }
-    'inl'   { TInL }
-    'inr'   { TInR }
-    '+'     { TSum }
-    '|'     { TBar }
-    'case'  { TCase }
-    'of'    { TOf }
-    'let'   { TLet }
-    'in'    { TIn }
-    var     { TVar $$ }
+    '*'         { TStar }
+    '[]'        { TBox }
+    ':'         { TColon }
+    '\\'        { TLambda }
+    '.'         { TDot }
+    '('         { TLParen }
+    ')'         { TRParen }
+    '->'        { TArrow }
+    '='         { TEquals }
+    ','         { TComma }
+    '×'         { TProduct }
+    '.1'        { TFirst }
+    '.2'        { TSecond }
+    'inl'       { TInL }
+    'inr'       { TInR }
+    '+'         { TSum }
+    '|'         { TBar }
+    'case'      { TCase }
+    'of'        { TOf }
+    'let'       { TLet }
+    'in'        { TIn }
+    'fold'      { TFold }
+    'unfold'    { TUnfold }
+    '['         { TLBracket }
+    ']'         { TRBracket }
+    '~'         { TTilde }
+    var         { TVar $$ }
 
 %right '->'
 
@@ -53,6 +58,9 @@ Term : Sort                                                         { Srt $1 }
      | 'case' Term 'of' 'inl' var '->' Term '|' 'inr' var '->' Term { Case $2 $5 $7 $10 $12 }
      | 'let' var '=' Term 'in' Term                                 { Let $2 $4 $6 }
      | 'let' var ':' Term 'in' Term                                 { Decl $2 $4 $6 }
+     | 'fold' '[' Term ']' Term                                     { Fold $3 $5 }
+     | 'unfold' '[' Term ']' Term                                   { Unfold $3 $5 }
+     | '~' var '.' Term                                             { Rec $2 $4 }
      | Fact                                                         { $1 }
 
 Fact : Fact Atom                                                    { App $1 $2 }

@@ -20,6 +20,9 @@ data Term
   | InR Term Term
   | Sum Term Term
   | Case Term Sym Term Sym Term
+  | Fold Term Term
+  | Unfold Term Term
+  | Rec Sym Term
   deriving (Eq)
 
 instance Show Term where
@@ -40,6 +43,9 @@ instance Show Term where
   show (InR t ty) = "inr " ++ show t ++ " : " ++ show ty
   show (Sum t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
   show (Case s x1 t1 x2 t2) = "case " ++ show s ++ " of inl " ++ x1 ++ " -> " ++ show t1 ++ " | " ++ "inr " ++ x2 ++ " -> " ++ show t2
+  show (Fold ty t) = "fold " ++ "[" ++ show ty ++ "] " ++ show t
+  show (Unfold ty t) = "unfold " ++ "[" ++ show ty ++ "] " ++ show t
+  show (Rec x t) = "~" ++ x ++ ". " ++ show t
 
 freeVars :: Term -> [Sym]
 freeVars (Srt _) = []
@@ -57,6 +63,9 @@ freeVars (InL t ty) = freeVars t `union` freeVars ty
 freeVars (InR t ty) = freeVars t `union` freeVars ty
 freeVars (Sum t1 t2) = freeVars t1 `union` freeVars t2
 freeVars (Case s x1 t1 x2 t2) = freeVars s `union` ((freeVars t1) \\ [x1]) `union` ((freeVars t2) \\ [x2])
+freeVars (Fold ty t) = freeVars ty `union` freeVars t
+freeVars (Unfold ty t) = freeVars ty `union` freeVars t
+freeVars (Rec x t) = freeVars t \\ [x]
 
 data Sort
   = Star

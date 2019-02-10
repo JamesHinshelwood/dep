@@ -1,0 +1,15 @@
+let Bool : * in
+let true : Bool in
+let false : Bool in
+let Unit : * in
+let unit : Unit in
+let Nat : * in
+let three : Nat in
+let NatList = ~ x . (Unit + (Nat × x)) in
+let NLBody = (Unit + (Nat × NatList)) in
+let nil = fold [NatList] (inl unit : NLBody) in
+let cons = \n : Nat . \l : NatList . fold [NatList] (inr (n, l) : NLBody) in
+let isnil = \l : NatList . case (unfold [NatList] l) of inl x -> true | inr x -> false in
+let tl = \l : NatList . case (unfold [NatList] l) of inl x -> l | inr p -> p.2 in
+let mylist = cons three nil in
+tl

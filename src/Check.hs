@@ -50,6 +50,10 @@ data TypeError = BoxUntyped
                | CaseBranchTypes Term Term
                | CaseNotSum Term
                | CaseType TypeError
+               | FoldRecType Term
+               | FoldNotRec Term
+               | UnfoldRecType Term
+               | UnfoldNotRec Term
                deriving (Show)
 
 left :: (a -> b) -> Either a c -> Either b c
@@ -144,6 +148,23 @@ typeOf g (Case s x1 t1 x2 t2) = case typeOf g s of
                                     else Left $ CaseBranchTypes t t'
                                   Right ty -> Left $ CaseNotSum ty
                                   Left err -> Left $ CaseType err
+typeOf g (Fold u t) = do
+  tTy <- typeOf g t
+  case u of
+    (Rec x ty) -> if tTy == subst ty x u
+      then return u
+      else Left $ FoldRecType tTy
+    ty -> Left $ FoldNotRec ty
+typeOf g (Unfold u t) = do
+  tTy <- typeOf g t
+  case u of
+    (Rec x ty) -> if tTy == u
+      then Right (subst ty x u)
+      else Left $ UnfoldRecType tTy
+    ty -> Left $ UnfoldNotRec ty
+typeOf g (Rec x t) = do
+  typeOf (addType x (Srt Star) g) t -- FIXME: Unsure
+  return $ Srt Star
 
 betaEq :: Context -> Term -> Term -> Bool
 betaEq g t1 t2 = alphaEq (nf g t1) (nf g t2)
@@ -164,11 +185,14 @@ alphaEq (InL tm1 ty1) (InL tm2 ty2) = alphaEq tm1 tm2 && alphaEq ty1 ty2
 alphaEq (InR tm1 ty1) (InR tm2 ty2) = alphaEq tm1 tm2 && alphaEq ty1 ty2
 alphaEq (Sum s1 t1) (Sum s2 t2) = alphaEq s1 s2 && alphaEq t1 t2
 alphaEq (Case s1 x1 t1 y1 u1) (Case s2 x2 t2 y2 u2) = alphaEq s1 s2 && alphaEq t1 (subst t2 x2 (Var x1)) && alphaEq u1 (subst u2 y2 (Var y1))
+alphaEq (Fold ty1 t1) (Fold ty2 t2) = alphaEq ty1 ty2 && alphaEq t1 t2
+alphaEq (Unfold ty1 t1) (Unfold ty2 t2) = alphaEq ty1 ty2 && alphaEq t1 t2
+alphaEq (Rec x1 t1) (Rec x2 t2) = alphaEq t1 (subst t2 x2 (Var x1))
 alphaEq _ _ = False
 
 nf :: Context -> Term -> Term
 nf g s@(Srt _) = s
-nf g (Var v) | isJust $ lookupTerm v g = nf g (fromJust $ lookupTerm v g)
+nf g (Var v) | isJust $ lookupTerm v g = nf g (fromJust $ lookupTerm v g) -- FIXME: Unused (terms are never in context, TermBinding should be removed)
 nf g v@(Var _) = v
 nf g (App (Lam x _ t1) t2) = nf g (subst t1 x t2)
 nf g (App t1 t2) = App (nf g t1) (nf g t2)
@@ -188,6 +212,10 @@ nf g (Sum t1 t2) = Sum (nf g t1) (nf g t2)
 nf g (Case (InL s _) x t _ _) = nf g (subst t x s)
 nf g (Case (InR s _) _ _ x t) = nf g (subst t x s)
 nf g (Case s x1 t1 x2 t2) = Case (nf g s) x1 (nf g t1) x2 (nf g t2)
+nf g (Unfold _ (Fold _ t)) = nf g t
+nf g (Fold ty t) = Fold ty (nf g t)
+nf g (Unfold ty t) = Unfold ty (nf g t)
+nf g (Rec x t) = Rec x (nf g t)
 
 subst :: Term -> Sym -> Term -> Term
 subst s@(Srt _) _ _ = s
@@ -235,6 +263,16 @@ subst (Case u x1 t1 x2 t2) y s = Case (subst u y s) x1' (subst t1' y s) x2' (sub
               let newX2 = freshVar x2 (freeVars u ++ freeVars s ++ freeVars t1 ++ freeVars t2) in
               let newT2 = subst t2 x2 (Var newX2) in
               (newX2, newT2)
+subst (Fold ty t) y s = Fold (subst ty y s) (subst t y s)
+subst (Unfold ty t) y s = Unfold (subst ty y s) (subst t y s)
+subst (Rec x t) y s = if x == y
+  then (Rec x t)
+  else if x `notElem` (freeVars s)
+    then (Rec x (subst t y s))
+    else
+      let newX = freshVar x (freeVars t ++ freeVars s) in
+      let newTm = Rec newX (subst t x (Var newX)) in
+      subst newTm y s
 
 abst con x1 ty tm x2 nTm = if x1 == x2
   then con x1 (subst ty x2 nTm) tm

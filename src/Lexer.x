@@ -35,6 +35,11 @@ tokens :-
     "of"                            { \s -> TOf }
     "let"                           { \s -> TLet }
     "in"                            { \s -> TIn }
+    "fold"                          { \s -> TFold }
+    "unfold"                        { \s -> TUnfold }
+    \[                              { \s -> TLBracket }
+    \]                              { \s -> TRBracket }
+    "~"                             { \s -> TTilde }
     $alpha [$alpha $digit \_ \']*   { \s -> TVar s }
 
 {
@@ -59,6 +64,11 @@ data Token = TStar
            | TOf
            | TLet
            | TIn
+           | TFold
+           | TUnfold
+           | TLBracket
+           | TRBracket
+           | TTilde
            | TVar String
            deriving (Eq, Show)
 
