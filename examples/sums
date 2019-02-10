@@ -1,4 +1,13 @@
 let A : * in
-let x : A in
-let y : A in
-inl x : A + A
+let T : * in
+let F : * in
+let Bool = (T + F) in
+let if = \a : * . \b : Bool . \t : a . \f : a . case b of inl x -> t | inr x -> f in
+let t : T in
+let f : F in
+let true = inl t : Bool in
+let false = inr f : Bool in
+let Nat : * in
+let one : Nat in
+let two : Nat in
+if Nat true one two

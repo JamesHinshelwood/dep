@@ -1,0 +1,5 @@
+let Nat : * in
+let zero : Nat in
+let succ : Nat -> Nat in
+let one = succ zero in
+succ one

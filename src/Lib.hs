@@ -19,4 +19,3 @@ repl = do
       putStrLn $ show term
       putStrLn "has type"
       putStrLn $ show ty
-  repl

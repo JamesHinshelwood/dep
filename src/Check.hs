@@ -62,7 +62,8 @@ rules = [(Star, Star), (Star, Box), (Box, Star), (Box, Box)]
 typeOf :: Context -> Term -> Either TypeError Term
 typeOf _ (Srt Star) = Right (Srt Box)
 typeOf _ (Srt Box) = Left BoxUntyped
-typeOf g (Var x) = maybe (Left $ VarUnbound x) Right (lookupType x g <|> lookupTerm x g)
+typeOf g (Var x) = maybe (Left $ VarUnbound x) Right $ lookupType x g
+
 typeOf g (Lam x ty tm) = left LambdaErr $ do
   typeOf g ty
   tmTy <- typeOf (addType x ty g) tm
@@ -87,7 +88,7 @@ typeOf g (Pi x lTy rTy) = case typeOf g lTy of
                                 _ -> Left $ PiRhsType rTy
                             _ -> Left $ PiLhsType lTy
 typeOf g (Let x tm t) = case typeOf g tm of
-                          Right ty -> typeOf (addType x ty (addTerm x tm g)) t
+                          Right ty -> typeOf (addType x ty g) (subst t x tm)
                           Left err -> Left $ LetType err
 typeOf g (Decl x ty t) = case typeOf g ty of
                           Right _ -> typeOf (addType x ty g) t
@@ -116,7 +117,7 @@ typeOf g (InL l ty) = case ty of
                         s@(Sum t1 _) -> case typeOf g s of
                           Right _ -> case typeOf g l of
                             Right lTy | lTy == t1 -> Right s
-                            Right ty -> Left $ InWrongType ty
+                            Right lTy -> Left $ InWrongType ty
                             Left err -> Left $ InType err
                           Left err -> Left $ InType err
                         t -> Left $ InWrongType t
@@ -203,17 +204,37 @@ subst (Let x t1 t2) y s = if x == y
       let newTm = Let newX t1 (subst t2 x (Var newX)) in
       subst newTm y s
 subst (Decl x t1 t2) y s = if x == y
- then Let x (subst t1 y s) t2
+ then Decl x (subst t1 y s) t2
  else if x `notElem` (freeVars s)
-   then Let x (subst t1 y s) (subst t2 y s)
+   then Decl x (subst t1 y s) (subst t2 y s)
    else
      let newX = freshVar x (freeVars s ++ freeVars t1 ++ freeVars t2) in
-     let newTm = Let newX t1 (subst t2 x (Var newX)) in
+     let newTm = Decl newX t1 (subst t2 x (Var newX)) in
      subst newTm y s
 subst (Pair t1 t2) x s = Pair (subst t1 x s) (subst t2 x s)
 subst (Product t1 t2) x s = Product (subst t1 x s) (subst t2 x s)
 subst (First t) x s = First (subst t x s)
 subst (Second t) x s = Second (subst t x s)
+subst (InL t ty) x s = InL (subst t x s) (subst ty x s)
+subst (InR t ty) x s = InR (subst t x s) (subst ty x s)
+subst (Sum t1 t2) x s = Sum (subst t1 x s) (subst t2 x s)
+subst (Case u x1 t1 x2 t2) y s = Case (subst u y s) x1' (subst t1' y s) x2' (subst t2' y s)
+  where (x1', t1') = if y == x1
+          then (x1, t1)
+          else if x1 `notElem` (freeVars s)
+            then (x1, t1)
+            else
+              let newX1 = freshVar x1 (freeVars u ++ freeVars s ++ freeVars t1 ++ freeVars t2) in
+              let newT1 = subst t1 x1 (Var newX1) in
+              (newX1, newT1)
+        (x2', t2') = if y == x2
+          then (x2, t2)
+          else if x2 `notElem` (freeVars s)
+            then (x2, t2)
+            else
+              let newX2 = freshVar x2 (freeVars u ++ freeVars s ++ freeVars t1 ++ freeVars t2) in
+              let newT2 = subst t2 x2 (Var newX2) in
+              (newX2, newT2)
 
 abst con x1 ty tm x2 nTm = if x1 == x2
   then con x1 (subst ty x2 nTm) tm

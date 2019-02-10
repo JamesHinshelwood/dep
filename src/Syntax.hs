@@ -30,7 +30,7 @@ instance Show Term where
   show (Pi x t1 t2) = if x `elem` (freeVars t2)
                         then "(" ++ x ++ " : " ++ show t1 ++ ") -> " ++ show t2
                         else show t1 ++ " -> " ++ show t2
-  show (Let x s t) = "let" ++ x ++ " = " ++ show s ++ " in " ++ show t
+  show (Let _ _ t) = show t
   show (Decl _ _ t) = show t
   show (Pair t1 t2) = "(" ++ show t1 ++ " , " ++ show t2 ++ ")"
   show (Product t1 t2) = "(" ++ show t1 ++ " × " ++ show t2 ++ ")"
@@ -53,6 +53,10 @@ freeVars (Pair t1 t2) = freeVars t1 `union` freeVars t2
 freeVars (Product t1 t2) = freeVars t1 `union` freeVars t2
 freeVars (First t) = freeVars t
 freeVars (Second t) = freeVars t
+freeVars (InL t ty) = freeVars t `union` freeVars ty
+freeVars (InR t ty) = freeVars t `union` freeVars ty
+freeVars (Sum t1 t2) = freeVars t1 `union` freeVars t2
+freeVars (Case s x1 t1 x2 t2) = freeVars s `union` ((freeVars t1) \\ [x1]) `union` ((freeVars t2) \\ [x2])
 
 data Sort
   = Star
