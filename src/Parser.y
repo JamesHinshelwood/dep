@@ -12,7 +12,7 @@ import Lexer
 %error { parseError }
 
 %token
-    '*'     { TStar }
+    'Type'  { TType }
     '[]'    { TBox }
     ':'     { TColon }
     '\\'    { TLambda }
@@ -22,7 +22,7 @@ import Lexer
     '->'    { TArrow }
     '='     { TEquals }
     ','     { TComma }
-    '×'     { TProduct }
+    '*'     { TProduct }
     '.1'    { TFirst }
     '.2'    { TSecond }
     'inl'   { TInL }
@@ -44,7 +44,7 @@ Term : Sort                                                         { Srt $1 }
      | '(' var ':' Term ')' '->' Term                               { Pi $2 $4 $7 }
      | Term '->' Term                                               { Pi "_" $1 $3 }
      | '(' Term ',' Term ')'                                        { Pair $2 $4 }
-     | '(' Term '×' Term ')'                                        { Product $2 $4 }
+     | '(' Term '*' Term ')'                                        { Product $2 $4 }
      | Term '.1'                                                    { First $1 }
      | Term '.2'                                                    { Second $1 }
      | 'inl' Term ':' Term                                          { InL $2 $4 }
@@ -61,7 +61,7 @@ Fact : Fact Atom                                                    { App $1 $2 
 Atom : '(' Term ')'                                                 { $2 }
      | var                                                          { Var $1 }
 
-Sort : '*'                                                          { Star }
+Sort : 'Type'                                                       { Star }
      | '[]'                                                         { Box }
 
 {

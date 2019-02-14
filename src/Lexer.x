@@ -14,7 +14,7 @@ tokens :-
 
     $white+                         ;
     "--".                           ;
-    \*                              { \s -> TStar }
+    "Type"                          { \s -> TType }
     "[]"                            { \s -> TBox }
     \:                              { \s -> TColon }
     \\                              { \s -> TLambda }
@@ -24,7 +24,7 @@ tokens :-
     "->"                            { \s -> TArrow }
     \=                              { \s -> TEquals }
     \,                              { \s -> TComma }
-    "×"                             { \s -> TProduct }
+    "*"                             { \s -> TProduct }
     ".1"                            { \s -> TFirst }
     ".2"                            { \s -> TSecond }
     "inl"                           { \s -> TInL }
@@ -38,7 +38,7 @@ tokens :-
     $alpha [$alpha $digit \_ \']*   { \s -> TVar s }
 
 {
-data Token = TStar
+data Token = TType
            | TBox
            | TColon
            | TLambda
