@@ -40,6 +40,8 @@ tokens :-
     \[                              { \s -> TLBracket }
     \]                              { \s -> TRBracket }
     "~"                             { \s -> TTilde }
+    "unit"                          { \s -> TUnit }
+    "Unit"                          { \s -> TUnitUpper }
     $alpha [$alpha $digit \_ \']*   { \s -> TVar s }
 
 {
@@ -69,6 +71,8 @@ data Token = TStar
            | TLBracket
            | TRBracket
            | TTilde
+           | TUnit
+           | TUnitUpper
            | TVar String
            deriving (Eq, Show)
 

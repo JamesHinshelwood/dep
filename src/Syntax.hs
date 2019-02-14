@@ -23,6 +23,8 @@ data Term
   | Fold Term Term
   | Unfold Term Term
   | Rec Sym Term
+  | Unit
+  | UnitTy
   deriving (Eq)
 
 instance Show Term where
@@ -46,6 +48,8 @@ instance Show Term where
   show (Fold ty t) = "fold " ++ "[" ++ show ty ++ "] " ++ show t
   show (Unfold ty t) = "unfold " ++ "[" ++ show ty ++ "] " ++ show t
   show (Rec x t) = "~" ++ x ++ ". " ++ show t
+  show (Unit) = "unit"
+  show (UnitTy) = "Unit"
 
 freeVars :: Term -> [Sym]
 freeVars (Srt _) = []
@@ -66,6 +70,8 @@ freeVars (Case s x1 t1 x2 t2) = freeVars s `union` ((freeVars t1) \\ [x1]) `unio
 freeVars (Fold ty t) = freeVars ty `union` freeVars t
 freeVars (Unfold ty t) = freeVars ty `union` freeVars t
 freeVars (Rec x t) = freeVars t \\ [x]
+freeVars (Unit) = []
+freeVars (UnitTy) = []
 
 data Sort
   = Star

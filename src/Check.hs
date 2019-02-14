@@ -2,6 +2,7 @@ module Check where
 
 import Control.Applicative
 import Data.Maybe
+import Debug.Trace
 import Syntax
 
 data Binding = TypeBinding Sym Term
@@ -70,7 +71,7 @@ typeOf g (Var x) = maybe (Left $ VarUnbound x) Right $ lookupType x g
 
 typeOf g (Lam x ty tm) = left LambdaErr $ do
   typeOf g ty
-  tmTy <- typeOf (addType x ty g) tm
+  tmTy <- typeOf (addType x (nf g ty) g) tm
   return $ Pi x ty tmTy
 typeOf g (App lhs rhs) = let lhsTy = typeOf g lhs in
                          case lhsTy of
@@ -92,7 +93,7 @@ typeOf g (Pi x lTy rTy) = case typeOf g lTy of
                                 _ -> Left $ PiRhsType rTy
                             _ -> Left $ PiLhsType lTy
 typeOf g (Let x tm t) = case typeOf g tm of
-                          Right ty -> typeOf (addType x ty g) (subst t x tm)
+                          Right ty -> typeOf (addType x ty g) (subst t x (nf g tm))
                           Left err -> Left $ LetType err
 typeOf g (Decl x ty t) = case typeOf g ty of
                           Right _ -> typeOf (addType x ty g) t
@@ -117,7 +118,7 @@ typeOf g (Second t) = case typeOf g t of
                         Right (Product _ t2) -> Right t2
                         Right ty -> Left $ ProjectNotProduct ty
                         Left err -> Left $ ProjectType err
-typeOf g (InL l ty) = case ty of
+typeOf g (InL l ty) = case (nf g ty) of
                         s@(Sum t1 _) -> case typeOf g s of
                           Right _ -> case typeOf g l of
                             Right lTy | lTy == t1 -> Right s
@@ -125,7 +126,7 @@ typeOf g (InL l ty) = case ty of
                             Left err -> Left $ InType err
                           Left err -> Left $ InType err
                         t -> Left $ InWrongType t
-typeOf g (InR l ty) = case ty of
+typeOf g (InR l ty) = case (nf g ty) of
                         s@(Sum _ t2) -> case typeOf g s of
                           Right _ -> case typeOf g l of
                             Right rTy | rTy == t2 -> Right s
@@ -150,21 +151,27 @@ typeOf g (Case s x1 t1 x2 t2) = case typeOf g s of
                                   Left err -> Left $ CaseType err
 typeOf g (Fold u t) = do
   tTy <- typeOf g t
-  case u of
-    (Rec x ty) -> if tTy == subst ty x u
+  let u' = nf g u
+  case u' of
+    (Rec x ty) -> if tTy == subst ty x u'
       then return u
       else Left $ FoldRecType tTy
     ty -> Left $ FoldNotRec ty
 typeOf g (Unfold u t) = do
   tTy <- typeOf g t
-  case u of
-    (Rec x ty) -> if tTy == u
-      then Right (subst ty x u)
+  let u' = nf g u
+  case u' of
+    (Rec x ty) -> if tTy == u'
+      then Right (subst ty x u')
       else Left $ UnfoldRecType tTy
     ty -> Left $ UnfoldNotRec ty
 typeOf g (Rec x t) = do
   typeOf (addType x (Srt Star) g) t -- FIXME: Unsure
   return $ Srt Star
+  -- Check positive
+  
+typeOf g (Unit) = Right UnitTy
+typeOf g (UnitTy) = Right $ Srt Star
 
 betaEq :: Context -> Term -> Term -> Bool
 betaEq g t1 t2 = alphaEq (nf g t1) (nf g t2)
@@ -188,6 +195,8 @@ alphaEq (Case s1 x1 t1 y1 u1) (Case s2 x2 t2 y2 u2) = alphaEq s1 s2 && alphaEq t
 alphaEq (Fold ty1 t1) (Fold ty2 t2) = alphaEq ty1 ty2 && alphaEq t1 t2
 alphaEq (Unfold ty1 t1) (Unfold ty2 t2) = alphaEq ty1 ty2 && alphaEq t1 t2
 alphaEq (Rec x1 t1) (Rec x2 t2) = alphaEq t1 (subst t2 x2 (Var x1))
+alphaEq (Unit) (Unit) = True
+alphaEq (UnitTy) (UnitTy) = True
 alphaEq _ _ = False
 
 nf :: Context -> Term -> Term
@@ -195,7 +204,7 @@ nf g s@(Srt _) = s
 nf g (Var v) | isJust $ lookupTerm v g = nf g (fromJust $ lookupTerm v g) -- FIXME: Unused (terms are never in context, TermBinding should be removed)
 nf g v@(Var _) = v
 nf g (App (Lam x _ t1) t2) = nf g (subst t1 x t2)
-nf g (App t1 t2) = App (nf g t1) (nf g t2)
+nf g (App t1 t2) = nf g (App (nf g t1) (nf g t2))
 nf g (Lam x ty tm) = Lam x (nf g ty) (nf g tm)
 nf g (Pi x ty tm) = Pi x (nf g ty) (nf g tm)
 nf g l@(Let _ _ _) = l -- FIXME: Not sure
@@ -213,9 +222,11 @@ nf g (Case (InL s _) x t _ _) = nf g (subst t x s)
 nf g (Case (InR s _) _ _ x t) = nf g (subst t x s)
 nf g (Case s x1 t1 x2 t2) = Case (nf g s) x1 (nf g t1) x2 (nf g t2)
 nf g (Unfold _ (Fold _ t)) = nf g t
-nf g (Fold ty t) = Fold ty (nf g t)
-nf g (Unfold ty t) = Unfold ty (nf g t)
+nf g (Fold ty t) = Fold (nf g ty) (nf g t)
+nf g (Unfold ty t) = Unfold (nf g ty) (nf g t)
 nf g (Rec x t) = Rec x (nf g t)
+nf g (Unit) = Unit
+nf g (UnitTy) = UnitTy
 
 subst :: Term -> Sym -> Term -> Term
 subst s@(Srt _) _ _ = s
@@ -273,6 +284,8 @@ subst (Rec x t) y s = if x == y
       let newX = freshVar x (freeVars t ++ freeVars s) in
       let newTm = Rec newX (subst t x (Var newX)) in
       subst newTm y s
+subst (Unit) _ _ = Unit
+subst (UnitTy) _ _ = UnitTy
 
 abst con x1 ty tm x2 nTm = if x1 == x2
   then con x1 (subst ty x2 nTm) tm

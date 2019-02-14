@@ -13,7 +13,7 @@ let mkone = \x:A . cons A zero x (nil A) in
 let mktwo = \x:A . \y:A . cons A one y (cons A zero x (nil A)) in
 let t : A in
 let u : A in
-let v : A in 
+let v : A in
 let first = mkone t in
 let second = mktwo u v in
-append A one two first second
+first

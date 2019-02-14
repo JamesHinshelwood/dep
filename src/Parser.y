@@ -38,6 +38,8 @@ import Lexer
     '['         { TLBracket }
     ']'         { TRBracket }
     '~'         { TTilde }
+    'unit'      { TUnit }
+    'Unit'      { TUnitUpper }
     var         { TVar $$ }
 
 %right '->'
@@ -61,6 +63,8 @@ Term : Sort                                                         { Srt $1 }
      | 'fold' '[' Term ']' Term                                     { Fold $3 $5 }
      | 'unfold' '[' Term ']' Term                                   { Unfold $3 $5 }
      | '~' var '.' Term                                             { Rec $2 $4 }
+     | 'unit'                                                       { Unit }
+     | 'Unit'                                                       { UnitTy }
      | Fact                                                         { $1 }
 
 Fact : Fact Atom                                                    { App $1 $2 }
