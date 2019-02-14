@@ -30,31 +30,34 @@ data TypeError = BoxUntyped
                | VarUnbound Sym
                | LambdaErr TypeError
                | AppRhsType Term Term
-               | AppRhsErr TypeError
                | AppLhsNotLambda Term
-               | AppLhsErr TypeError
+               | AppErr TypeError
                | PiBadAbstraction (Sort, Sort)
                | PiRhsType Term
                | PiLhsType Term
-               | LetType TypeError
-               | DeclType TypeError
-               | PairType TypeError
+               | PiErr TypeError
+               | LetErr TypeError
+               | DeclErr TypeError
+               | PairErr TypeError
                | ProductNotStar Term
-               | ProductType TypeError
+               | ProductErr TypeError
                | ProjectNotProduct Term
-               | ProjectType TypeError
+               | ProjectErr TypeError
                | InWrongType Term
-               | InType TypeError
+               | InErr TypeError
                | SumNotStar Term
-               | SumType TypeError
+               | SumErr TypeError
                | CaseBranchTypes Term Term
                | CaseNotSum Term
-               | CaseType TypeError
+               | CaseErr TypeError
                deriving (Show)
 
 left :: (a -> b) -> Either a c -> Either b c
 left f (Left x) = Left (f x)
 left _ (Right x) = Right x
+
+throw :: a -> Either a b
+throw = Left
 
 rules :: [(Sort, Sort)]
 rules = [(Star, Star), (Star, Box), (Box, Star), (Box, Box)]
@@ -63,87 +66,93 @@ typeOf :: Context -> Term -> Either TypeError Term
 typeOf _ (Srt Star) = Right (Srt Box)
 typeOf _ (Srt Box) = Left BoxUntyped
 typeOf g (Var x) = maybe (Left $ VarUnbound x) Right $ lookupType x g
-
 typeOf g (Lam x ty tm) = left LambdaErr $ do
   typeOf g ty
   tmTy <- typeOf (addType x ty g) tm
   return $ Pi x ty tmTy
-typeOf g (App lhs rhs) = let lhsTy = typeOf g lhs in
-                         case lhsTy of
-                          Right (Pi x lTy rTy) -> case typeOf g rhs of
-                                                  Right rhsTy ->
-                                                    if betaEq g lTy rhsTy
-                                                      then Right $ subst rTy x rhs
-                                                      else Left $ AppRhsType lTy rhsTy
-                                                  Left err -> Left $ AppRhsErr err
-                          Right ty -> Left $ AppLhsNotLambda ty
-                          Left err -> Left $ AppLhsErr err
-typeOf g (Pi x lTy rTy) = case typeOf g lTy of
-                            Right (Srt lSort) ->
-                              case typeOf (addType x lTy g) rTy of
-                                Right (Srt rSort) ->
-                                  if (lSort, rSort) `elem` rules
-                                    then Right $ Srt rSort
-                                    else Left $ PiBadAbstraction (lSort, rSort)
-                                _ -> Left $ PiRhsType rTy
-                            _ -> Left $ PiLhsType lTy
-typeOf g (Let x tm t) = case typeOf g tm of
-                          Right ty -> typeOf (addType x ty g) (subst t x tm)
-                          Left err -> Left $ LetType err
-typeOf g (Decl x ty t) = case typeOf g ty of
-                          Right _ -> typeOf (addType x ty g) t
-                          Left err -> Left $ DeclType err
-typeOf g (Pair t1 t2) = case typeOf g t1 of
-                          Right ty1 -> case typeOf g t2 of
-                            Right ty2 -> Right $ Product ty1 ty2
-                            Left err -> Left $ PairType err
-                          Left err -> Left $ PairType err
-typeOf g (Product t1 t2) = case typeOf g t1 of
-                            Right (Srt Star) -> case typeOf g t2 of
-                              Right (Srt Star) -> Right $ Srt Star
-                              Right ty -> Left $ ProductNotStar ty
-                              Left err -> Left $ ProductType err
-                            Right ty -> Left $ ProductNotStar ty
-                            Left err -> Left $ ProductType err
-typeOf g (First t) = case typeOf g t of
-                        Right (Product t1 _) -> Right t1
-                        Right ty -> Left $ ProjectNotProduct ty
-                        Left err -> Left $ ProjectType err
-typeOf g (Second t) = case typeOf g t of
-                        Right (Product _ t2) -> Right t2
-                        Right ty -> Left $ ProjectNotProduct ty
-                        Left err -> Left $ ProjectType err
-typeOf g (InL l ty) = case ty of
-                        s@(Sum t1 _) -> case typeOf g s of
-                          Right _ -> case typeOf g l of
-                            Right lTy | lTy == t1 -> Right s
-                            Right lTy -> Left $ InWrongType ty
-                            Left err -> Left $ InType err
-                          Left err -> Left $ InType err
-                        t -> Left $ InWrongType t
-typeOf g (InR l ty) = case ty of
-                        s@(Sum _ t2) -> case typeOf g s of
-                          Right _ -> case typeOf g l of
-                            Right rTy | rTy == t2 -> Right s
-                            Right ty -> Left $ InWrongType ty
-                            Left err -> Left $ InType err
-                          Left err -> Left $ InType err
-                        t -> Left $ InWrongType t
-typeOf g (Sum t1 t2) = case typeOf g t1 of
-                        Right (Srt Star) -> case typeOf g t2 of
-                          Right (Srt Star) -> Right $ Srt Star
-                          Right ty -> Left $ SumNotStar ty
-                          Left err -> Left $ SumType err
-                        Right ty -> Left $ SumNotStar ty
-                        Left err -> Left $ SumType err
-typeOf g (Case s x1 t1 x2 t2) = case typeOf g s of
-                                  Right (Sum ty1 ty2) -> do
-                                    t <- typeOf (addType x1 ty1 g) t1
-                                    t' <- typeOf (addType x2 ty2 g) t2
-                                    if t == t' then Right t
-                                    else Left $ CaseBranchTypes t t'
-                                  Right ty -> Left $ CaseNotSum ty
-                                  Left err -> Left $ CaseType err
+typeOf g (App lhs rhs) = left AppErr $ do
+  lhsTy <- typeOf g lhs
+  rhsTy <- typeOf g rhs
+  case lhsTy of
+    Pi x lTy rTy -> if betaEq g lTy rhsTy
+      then return $ subst rTy x rhs
+      else throw $ AppRhsType lTy rhsTy
+    ty -> throw $ AppLhsNotLambda ty
+typeOf g (Pi x lTy rTy) = left PiErr $ do
+  lSort <- typeOf g lTy
+  rSort <- typeOf (addType x lTy g) rTy
+  case (lSort, rSort) of
+    (Srt l, Srt r) -> if (l, r) `elem` rules
+      then return $ Srt r
+      else throw $ PiBadAbstraction (l, r)
+    (Srt l, _) -> throw $ PiRhsType rTy
+    (_, _) -> throw $ PiLhsType lTy
+typeOf g (Let x tm t) = left LetErr $ do
+  ty <- typeOf g tm
+  letTy <- typeOf (addType x ty g) (subst t x tm)
+  return letTy
+typeOf g (Decl x ty t) = left DeclErr $ do
+  typeOf g ty
+  declTy <- typeOf (addType x ty g) t
+  return declTy
+typeOf g (Pair t1 t2) = left PairErr $ do
+  ty1 <- typeOf g t1
+  ty2 <- typeOf g t2
+  return $ Product ty1 ty2
+typeOf g (Product t1 t2) = left ProductErr $ do
+  ty1 <- typeOf g t1
+  ty2 <- typeOf g t2
+  case (ty1, ty2) of
+    (Srt Star, Srt Star) -> return $ Srt Star
+    (Srt Star, ty) -> throw $ ProductNotStar ty
+    (ty, _) -> throw $ ProductNotStar ty
+typeOf g (First t) = left ProjectErr $ do
+  ty <- typeOf g t
+  case ty of
+    Product t1 _ -> return t1
+    ty -> throw $ ProjectNotProduct ty
+typeOf g (Second t) = left ProjectErr $ do
+  ty <- typeOf g t
+  case ty of
+    Product _ t2 -> return t2
+    ty -> throw $ ProjectNotProduct ty
+typeOf g (InL l ty) = left InErr $ do
+  let ty' = nf g ty
+  case ty' of
+    s@(Sum t1 _) -> do
+      typeOf g s
+      lTy <- typeOf g l
+      if lTy == t1
+        then return s
+        else throw $ InWrongType lTy
+    ty -> throw $ InWrongType ty
+typeOf g (InR r ty) = left InErr $ do
+  let ty' = nf g ty
+  case ty' of
+    s@(Sum _ t2) -> do
+      typeOf g s
+      rTy <- typeOf g r
+      if rTy == t2
+        then return s
+        else throw $ InWrongType rTy
+    ty -> throw $ InWrongType ty
+typeOf g (Sum t1 t2) = left SumErr $ do
+  ty1 <- typeOf g t1
+  ty2 <- typeOf g t2
+  case (ty1, ty2) of
+    (Srt Star, Srt Star) -> return $ Srt Star
+    (Srt Star, ty) -> throw $ SumNotStar ty
+    (ty, _) -> throw $ SumNotStar ty
+typeOf g (Case s x1 t1 x2 t2) = left CaseErr $ do
+  ty <- typeOf g s
+  case ty of
+    Sum ty1 ty2 -> do
+      t <- typeOf (addType x1 ty1 g) t1
+      t' <- typeOf (addType x2 ty2 g) t2
+      if t == t'
+        then return t
+        else throw $ CaseBranchTypes t t'
+    ty -> throw $ CaseNotSum ty
 typeOf g (Unit) = Right UnitTy
 typeOf g (UnitTy) = Right $ Srt Star
 
