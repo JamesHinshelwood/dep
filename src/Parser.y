@@ -45,8 +45,9 @@ Term : Sort                                                         { Srt $1 }
      | '\\' var ':' Term '.' Term                                   { Lam $2 $4 $6 }
      | '(' var ':' Term ')' '->' Term                               { Pi $2 $4 $7 }
      | Term '->' Term                                               { Pi "_" $1 $3 }
-     | '(' Term ',' Term ')'                                        { Pair $2 $4 }
-     | '(' Term '*' Term ')'                                        { Product $2 $4 }
+     | '(' Term ',' Term ':' Term ')'                               { TypedPair $2 $4 $6 }
+     | '(' var ':' Term '*' Term ')'                                { Sigma $2 $4 $6 }
+     | '(' Term '*' Term ')'                                        { Sigma "_" $2 $4 }
      | Term '.1'                                                    { First $1 }
      | Term '.2'                                                    { Second $1 }
      | 'inl' Term ':' Term                                          { InL $2 $4 }

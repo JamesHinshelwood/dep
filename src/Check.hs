@@ -38,10 +38,12 @@ data TypeError = BoxUntyped
                | PiErr TypeError
                | LetErr TypeError
                | DeclErr TypeError
-               | PairErr TypeError
-               | ProductNotStar Term
-               | ProductErr TypeError
-               | ProjectNotProduct Term
+               | TypedPairErr TypeError
+               | TypedPairMismatch Term Term
+               | TypedPairNotSigma Term
+               | SigmaNotStar Term
+               | SigmaErr TypeError
+               | ProjectNotSigma Term
                | ProjectErr TypeError
                | InWrongType Term
                | InErr TypeError
@@ -64,12 +66,16 @@ rules = [(Star, Star), (Star, Box), (Box, Star), (Box, Box)]
 
 typeOf :: Context -> Term -> Either TypeError Term
 typeOf _ (Srt Star) = Right (Srt Box)
+
 typeOf _ (Srt Box) = Left BoxUntyped
+
 typeOf g (Var x) = maybe (Left $ VarUnbound x) Right $ lookupType x g
+
 typeOf g (Lam x ty tm) = left LambdaErr $ do
   typeOf g ty
   tmTy <- typeOf (addType x ty g) tm
   return $ Pi x ty tmTy
+
 typeOf g (App lhs rhs) = left AppErr $ do
   lhsTy <- typeOf g lhs
   rhsTy <- typeOf g rhs
@@ -78,6 +84,7 @@ typeOf g (App lhs rhs) = left AppErr $ do
       then return $ subst rTy x rhs
       else throw $ AppRhsType lTy rhsTy
     ty -> throw $ AppLhsNotLambda ty
+
 typeOf g (Pi x lTy rTy) = left PiErr $ do
   lSort <- typeOf g lTy
   rSort <- typeOf (addType x lTy g) rTy
@@ -87,35 +94,49 @@ typeOf g (Pi x lTy rTy) = left PiErr $ do
       else throw $ PiBadAbstraction (l, r)
     (Srt l, _) -> throw $ PiRhsType rTy
     (_, _) -> throw $ PiLhsType lTy
+
 typeOf g (Let x tm t) = left LetErr $ do
   ty <- typeOf g tm
   letTy <- typeOf (addType x ty g) (subst t x tm)
   return letTy
+
 typeOf g (Decl x ty t) = left DeclErr $ do
   typeOf g ty
   declTy <- typeOf (addType x ty g) t
   return declTy
-typeOf g (Pair t1 t2) = left PairErr $ do
-  ty1 <- typeOf g t1
-  ty2 <- typeOf g t2
-  return $ Product ty1 ty2
-typeOf g (Product t1 t2) = left ProductErr $ do
-  ty1 <- typeOf g t1
-  ty2 <- typeOf g t2
-  case (ty1, ty2) of
+
+typeOf g (TypedPair t1 t2 ty) = left TypedPairErr $ do
+  case ty of
+    Sigma x s t -> do
+      t1Ty <- typeOf g t1
+      t2Ty <- typeOf g t2
+      if betaEq g t1Ty s
+        then if betaEq g t2Ty (subst t x t1)
+          then return ty
+          else throw $ TypedPairMismatch t2Ty (subst t x t1)
+        else throw $ TypedPairMismatch t1Ty s
+    ty -> throw $ TypedPairNotSigma ty
+
+typeOf g (Sigma x s t) = left SigmaErr $ do
+  sKind <- typeOf g s
+  tKind <- typeOf (addType x s g) t
+  case (sKind, tKind) of
     (Srt Star, Srt Star) -> return $ Srt Star
-    (Srt Star, ty) -> throw $ ProductNotStar ty
-    (ty, _) -> throw $ ProductNotStar ty
+    (Srt Star, ty) -> throw $ SigmaNotStar ty
+    (ty, _) -> throw $ SigmaNotStar ty
+
 typeOf g (First t) = left ProjectErr $ do
   ty <- typeOf g t
   case ty of
-    Product t1 _ -> return t1
-    ty -> throw $ ProjectNotProduct ty
+    Sigma _ t1 _ -> return t1
+    ty -> throw $ ProjectNotSigma ty
+
 typeOf g (Second t) = left ProjectErr $ do
   ty <- typeOf g t
   case ty of
-    Product _ t2 -> return t2
-    ty -> throw $ ProjectNotProduct ty
+    Sigma x _ t2 -> return (subst t2 x (First t))
+    ty -> throw $ ProjectNotSigma ty
+
 typeOf g (InL l ty) = left InErr $ do
   let ty' = nf g ty
   case ty' of
@@ -126,6 +147,7 @@ typeOf g (InL l ty) = left InErr $ do
         then return s
         else throw $ InWrongType lTy
     ty -> throw $ InWrongType ty
+
 typeOf g (InR r ty) = left InErr $ do
   let ty' = nf g ty
   case ty' of
@@ -136,6 +158,7 @@ typeOf g (InR r ty) = left InErr $ do
         then return s
         else throw $ InWrongType rTy
     ty -> throw $ InWrongType ty
+
 typeOf g (Sum t1 t2) = left SumErr $ do
   ty1 <- typeOf g t1
   ty2 <- typeOf g t2
@@ -143,6 +166,7 @@ typeOf g (Sum t1 t2) = left SumErr $ do
     (Srt Star, Srt Star) -> return $ Srt Star
     (Srt Star, ty) -> throw $ SumNotStar ty
     (ty, _) -> throw $ SumNotStar ty
+
 typeOf g (Case s x1 t1 x2 t2) = left CaseErr $ do
   ty <- typeOf g s
   case ty of
@@ -153,7 +177,9 @@ typeOf g (Case s x1 t1 x2 t2) = left CaseErr $ do
         then return t
         else throw $ CaseBranchTypes t t'
     ty -> throw $ CaseNotSum ty
+
 typeOf g (Unit) = Right UnitTy
+
 typeOf g (UnitTy) = Right $ Srt Star
 
 betaEq :: Context -> Term -> Term -> Bool
@@ -167,8 +193,8 @@ alphaEq (App s1 t1) (App s2 t2) = alphaEq s1 s2 && alphaEq t1 t2
 alphaEq (Pi x1 ty1 tm1) (Pi x2 ty2 tm2) = alphaEq ty1 ty2 && alphaEq tm1 (subst tm2 x2 (Var x1))
 alphaEq (Let x1 s1 t1) (Let x2 s2 t2) = alphaEq s1 s2 && alphaEq t1 (subst t2 x2 (Var x1))
 alphaEq (Decl x1 s1 t1) (Decl x2 s2 t2) = alphaEq s1 s2 && alphaEq t1 (subst t2 x2 (Var x1))
-alphaEq (Pair s1 t1) (Pair s2 t2) = alphaEq s1 s2 && alphaEq t1 t2
-alphaEq (Product s1 t1) (Product s2 t2) = alphaEq s1 s2 && alphaEq t1 t2
+alphaEq (TypedPair s1 t1 ty1) (TypedPair s2 t2 ty2) = alphaEq s1 s2 && alphaEq t1 t2 && alphaEq ty1 ty2
+alphaEq (Sigma x1 s1 t1) (Sigma x2 s2 t2) = alphaEq s1 s2 && alphaEq t1 (subst t2 x2 (Var x1))
 alphaEq (First t1) (First t2) = alphaEq t1 t2
 alphaEq (Second t1) (Second t2) = alphaEq t1 t2
 alphaEq (InL tm1 ty1) (InL tm2 ty2) = alphaEq tm1 tm2 && alphaEq ty1 ty2
@@ -189,10 +215,10 @@ nf g (Lam x ty tm) = Lam x (nf g ty) (nf g tm)
 nf g (Pi x ty tm) = Pi x (nf g ty) (nf g tm)
 nf g l@(Let _ _ _) = l -- FIXME: Not sure
 nf g d@(Decl _ _ _) = d -- FIXME: Not sure
-nf g (Pair t1 t2) = Pair (nf g t1) (nf g t2)
-nf g (Product t1 t2) = Product (nf g t1) (nf g t2)
-nf g (First (Pair t _)) = nf g t
-nf g (Second (Pair _ t)) = nf g t
+nf g (TypedPair t1 t2 ty) = TypedPair (nf g t1) (nf g t2) (nf g ty)
+nf g (Sigma x t1 t2) = Sigma x (nf g t1) (nf g t2)
+nf g (First (TypedPair t _ _)) = nf g t
+nf g (Second (TypedPair _ t _)) = nf g t
 nf g (First t) = First (nf g t)
 nf g (Second t) = Second (nf g t)
 nf g (InL t ty) = InL (nf g t) ty
@@ -226,8 +252,15 @@ subst (Decl x t1 t2) y s = if x == y
      let newX = freshVar x (freeVars s ++ freeVars t1 ++ freeVars t2) in
      let newTm = Decl newX t1 (subst t2 x (Var newX)) in
      subst newTm y s
-subst (Pair t1 t2) x s = Pair (subst t1 x s) (subst t2 x s)
-subst (Product t1 t2) x s = Product (subst t1 x s) (subst t2 x s)
+subst (TypedPair t1 t2 ty) x s = TypedPair (subst t1 x s) (subst t2 x s) (subst ty x s)
+subst (Sigma x t1 t2) y s = if x == y
+  then Sigma x (subst t1 y s) t2
+  else if x `notElem` (freeVars s)
+    then Sigma x (subst t1 y s) (subst t2 y s)
+    else
+      let newX = freshVar x (freeVars t1 ++ freeVars t2 ++ freeVars s) in
+      let newTm = Sigma newX (subst t1 x (Var newX)) (subst t2 x (Var newX)) in
+      subst newTm y s
 subst (First t) x s = First (subst t x s)
 subst (Second t) x s = Second (subst t x s)
 subst (InL t ty) x s = InL (subst t x s) (subst ty x s)

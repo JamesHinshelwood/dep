@@ -1,0 +1,9 @@
+let Nat : Type in
+let Eq : Nat -> Nat -> Type in
+let plus : Nat -> Nat -> Nat in
+let two : Nat in
+let five : Nat in
+let three : Nat in
+let twoPlusThreeIsFive : (Eq (plus two three) five) in
+let twoLeqfive = (three, twoPlusThreeIsFive : (k : Nat * (Eq (plus two k) five))) in 
+twoLeqfive

@@ -12,8 +12,8 @@ data Term
   | Pi Sym Term Term
   | Let Sym Term Term
   | Decl Sym Term Term
-  | Pair Term Term
-  | Product Term Term
+  | TypedPair Term Term Term
+  | Sigma Sym Term Term
   | First Term
   | Second Term
   | InL Term Term
@@ -30,12 +30,14 @@ instance Show Term where
   show (Lam x t1 t2) = "(\\" ++ x ++ " : " ++ show t1 ++ ". " ++ show t2 ++ ")"
   show (App t1 t2) = "(" ++ show t1 ++ " " ++ show t2 ++ ")"
   show (Pi x t1 t2) = if x `elem` (freeVars t2)
-                        then "(" ++ x ++ " : " ++ show t1 ++ ") -> " ++ show t2
-                        else show t1 ++ " -> " ++ show t2
+    then "(" ++ x ++ " : " ++ show t1 ++ ") -> " ++ show t2
+    else show t1 ++ " -> " ++ show t2
   show (Let _ _ t) = show t
   show (Decl _ _ t) = show t
-  show (Pair t1 t2) = "(" ++ show t1 ++ " , " ++ show t2 ++ ")"
-  show (Product t1 t2) = "(" ++ show t1 ++ " × " ++ show t2 ++ ")"
+  show (TypedPair t1 t2 ty) = "(" ++ show t1 ++ " , " ++ show t2 ++ ":" ++ show ty ++ ")"
+  show (Sigma x t1 t2) = if x `elem` (freeVars t2)
+    then "(" ++ x ++ " : " ++ show t1 ++ " * " ++ show t2 ++ ")"
+    else "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
   show (First t) = show t ++ ".1"
   show (Second t) = show t ++ ".2"
   show (InL t ty) = "inl " ++ show t ++ " : " ++ show ty
@@ -53,8 +55,8 @@ freeVars (App lhs rhs) = (freeVars lhs) `union` (freeVars rhs)
 freeVars (Pi x lTy rTy) = ((freeVars rTy) \\ [x]) `union` (freeVars lTy)
 freeVars (Let x t1 t2) = ((freeVars t2) \\ [x]) `union` (freeVars t1)
 freeVars (Decl x t1 t2) = ((freeVars t2) \\ [x]) `union` (freeVars t1)
-freeVars (Pair t1 t2) = freeVars t1 `union` freeVars t2
-freeVars (Product t1 t2) = freeVars t1 `union` freeVars t2
+freeVars (TypedPair t1 t2 ty) = freeVars t1 `union` freeVars t2 `union` freeVars ty
+freeVars (Sigma x t1 t2) = ((freeVars t2) \\ [x]) `union` (freeVars t1)
 freeVars (First t) = freeVars t
 freeVars (Second t) = freeVars t
 freeVars (InL t ty) = freeVars t `union` freeVars ty
