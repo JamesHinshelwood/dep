@@ -144,6 +144,8 @@ typeOf g (Case s x1 t1 x2 t2) = case typeOf g s of
                                     else Left $ CaseBranchTypes t t'
                                   Right ty -> Left $ CaseNotSum ty
                                   Left err -> Left $ CaseType err
+typeOf g (Unit) = Right UnitTy
+typeOf g (UnitTy) = Right $ Srt Star
 
 betaEq :: Context -> Term -> Term -> Bool
 betaEq g t1 t2 = alphaEq (nf g t1) (nf g t2)
@@ -164,6 +166,8 @@ alphaEq (InL tm1 ty1) (InL tm2 ty2) = alphaEq tm1 tm2 && alphaEq ty1 ty2
 alphaEq (InR tm1 ty1) (InR tm2 ty2) = alphaEq tm1 tm2 && alphaEq ty1 ty2
 alphaEq (Sum s1 t1) (Sum s2 t2) = alphaEq s1 s2 && alphaEq t1 t2
 alphaEq (Case s1 x1 t1 y1 u1) (Case s2 x2 t2 y2 u2) = alphaEq s1 s2 && alphaEq t1 (subst t2 x2 (Var x1)) && alphaEq u1 (subst u2 y2 (Var y1))
+alphaEq (Unit) (Unit) = True
+alphaEq (UnitTy) (UnitTy) = True
 alphaEq _ _ = False
 
 nf :: Context -> Term -> Term
@@ -188,6 +192,8 @@ nf g (Sum t1 t2) = Sum (nf g t1) (nf g t2)
 nf g (Case (InL s _) x t _ _) = nf g (subst t x s)
 nf g (Case (InR s _) _ _ x t) = nf g (subst t x s)
 nf g (Case s x1 t1 x2 t2) = Case (nf g s) x1 (nf g t1) x2 (nf g t2)
+nf g (Unit) = Unit
+nf g (UnitTy) = UnitTy
 
 subst :: Term -> Sym -> Term -> Term
 subst s@(Srt _) _ _ = s
@@ -235,6 +241,8 @@ subst (Case u x1 t1 x2 t2) y s = Case (subst u y s) x1' (subst t1' y s) x2' (sub
               let newX2 = freshVar x2 (freeVars u ++ freeVars s ++ freeVars t1 ++ freeVars t2) in
               let newT2 = subst t2 x2 (Var newX2) in
               (newX2, newT2)
+subst (Unit) y s = Unit
+subst (UnitTy) y s = UnitTy
 
 abst con x1 ty tm x2 nTm = if x1 == x2
   then con x1 (subst ty x2 nTm) tm
@@ -244,21 +252,6 @@ abst con x1 ty tm x2 nTm = if x1 == x2
       let newX1 = freshVar x1 (freeVars tm ++ freeVars nTm) in
       let newTm = con newX1 (subst ty x1 (Var newX1)) (subst tm x1 (Var newX1)) in
       subst newTm x2 nTm
-
-whnf :: Context -> Term -> Term
-whnf g t = case whred g t of
-  Just t' -> whnf g t'
-  Nothing -> t
-
-whred :: Context -> Term -> Maybe Term
-whred g (App t1 t2) | isJust $ whred g t1 = Just $ App (fromJust $ whred g t1) t2
-whred _ (App (Lam x _ t1) t2) = Just $ subst t1 x t2
-whred _ (First (Pair t1 _)) = Just $ t1
-whred g (First t) | isJust $ whred g t = Just $ First $ fromJust $ whred g t
-whred _ (Second (Pair _ t2)) = Just $ t2
-whred g (Second t) | isJust $ whred g t = Just $ Second $ fromJust $ whred g t
-whred g (Var v) = lookupTerm v g
-whred _ _ = Nothing
 
 freshVar :: Sym -> [Sym] -> Sym
 freshVar x vars = if x `elem` vars then freshVar (x ++ "'") vars else x

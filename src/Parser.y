@@ -33,6 +33,8 @@ import Lexer
     'of'    { TOf }
     'let'   { TLet }
     'in'    { TIn }
+    'unit'  { TUnit }
+    'Unit'  { TUnitUpper }
     var     { TVar $$ }
 
 %right '->'
@@ -53,6 +55,8 @@ Term : Sort                                                         { Srt $1 }
      | 'case' Term 'of' 'inl' var '->' Term '|' 'inr' var '->' Term { Case $2 $5 $7 $10 $12 }
      | 'let' var '=' Term 'in' Term                                 { Let $2 $4 $6 }
      | 'let' var ':' Term 'in' Term                                 { Decl $2 $4 $6 }
+     | 'unit'                                                       { Unit }
+     | 'Unit'                                                       { UnitTy }
      | Fact                                                         { $1 }
 
 Fact : Fact Atom                                                    { App $1 $2 }

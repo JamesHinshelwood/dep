@@ -35,6 +35,8 @@ tokens :-
     "of"                            { \s -> TOf }
     "let"                           { \s -> TLet }
     "in"                            { \s -> TIn }
+    "unit"                          { \s -> TUnit }
+    "Unit"                          { \s -> TUnitUpper }
     $alpha [$alpha $digit \_ \']*   { \s -> TVar s }
 
 {
@@ -59,6 +61,8 @@ data Token = TType
            | TOf
            | TLet
            | TIn
+           | TUnit
+           | TUnitUpper
            | TVar String
            deriving (Eq, Show)
 
