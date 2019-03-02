@@ -1,12 +1,12 @@
-let A : * in
-let Nat : * in
+let A : Type in
+let Nat : Type in
 let zero : Nat in
 let succ : Nat -> Nat in
 let plus : Nat -> Nat -> Nat in
-let Vector : * -> Nat -> * in
-let nil : (a : *) -> Vector a zero in
-let cons : (a : *) -> (n : Nat) -> a -> (Vector a n) -> (Vector a (succ n)) in
-let append : (a : *) -> (m : Nat) -> (n : Nat) -> (Vector a m) -> (Vector a n) -> (Vector a (plus m n)) in
+let Vector : Type -> Nat -> Type in
+let nil : (a : Type) -> Vector a zero in
+let cons : (a : Type) -> (n : Nat) -> a -> (Vector a n) -> (Vector a (succ n)) in
+let append : (a : Type) -> (m : Nat) -> (n : Nat) -> (Vector a m) -> (Vector a n) -> (Vector a (plus m n)) in
 let one = succ zero in
 let two = succ one in
 let mkone = \x:A . cons A zero x (nil A) in
