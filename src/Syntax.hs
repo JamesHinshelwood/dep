@@ -11,6 +11,7 @@ module Syntax where
 import Prelude hiding ((<>))
 
 import Unbound.LocallyNameless
+import Data.Set
 
 import Text.PrettyPrint (Doc, (<+>), (<>), text, colon, char, parens, ($$), comma)
 
@@ -110,7 +111,9 @@ instance Pretty Term where
     x' <- pp x
     t1' <- pp t1
     t2' <- pp t2
-    return $ (parens $ x' <+> colon <+> t1') <+> arrow <+> t2'
+    if x `notMember` fv t2
+      then return $ t1' <+> arrow <+> t2'
+      else return $ (parens $ x' <+> colon <+> t1') <+> arrow <+> t2'
   pp (Let b) = lunbind b $ \((x, Embed t1), t2) -> do
     x' <- pp x
     t1' <- pp t1
