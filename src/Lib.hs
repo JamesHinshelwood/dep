@@ -6,16 +6,13 @@ import Syntax
 import Check
 import Parser
 
-import Control.Monad
-import Data.Either
+import Unbound.LocallyNameless
 
 repl :: IO ()
 repl = do
   input <- getContents
   let term = parseTerm input
-  case typeOf [] term of
-    Left err -> putStrLn $ show err
-    Right ty -> do
-      putStrLn $ show term
-      putStrLn "has type"
-      putStrLn $ show ty
+  let ty = runLFreshM $ typeOf [] term
+  putStrLn $ show $ runLFreshM $ pp term
+  putStrLn "has type"
+  putStrLn $ show $ runLFreshM $ pp ty

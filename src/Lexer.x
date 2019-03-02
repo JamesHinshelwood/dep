@@ -15,7 +15,6 @@ tokens :-
     $white+                         ;
     "--".                           ;
     "Type"                          { \s -> TType }
-    "[]"                            { \s -> TBox }
     \:                              { \s -> TColon }
     \\                              { \s -> TLambda }
     \.                              { \s -> TDot }
@@ -41,7 +40,6 @@ tokens :-
 
 {
 data Token = TType
-           | TBox
            | TColon
            | TLambda
            | TDot

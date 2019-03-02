@@ -25,6 +25,9 @@ dependencies:
 - array
 - mtl
 - transformers
+- unbound
+- pretty
+- containers
 
 library:
   source-dirs: src

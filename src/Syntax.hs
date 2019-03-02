@@ -1,76 +1,162 @@
+{-# LANGUAGE MultiParamTypeClasses,
+             TemplateHaskell,
+             ScopedTypeVariables,
+             FlexibleInstances,
+             FlexibleContexts,
+             UndecidableInstances
+#-}
+
 module Syntax where
 
-import Data.List
+import Prelude hiding ((<>))
 
-type Sym = String
+import Unbound.LocallyNameless
+
+import Text.PrettyPrint (Doc, (<+>), (<>), text, colon, char, parens, ($$), comma)
+
+slash :: Doc
+slash = char '\\'
+
+dot :: Doc
+dot = char '.'
+
+arrow :: Doc
+arrow = text "->"
+
+equals :: Doc
+equals = char '='
+
+mid :: Doc
+mid = char '|'
+
+star :: Doc
+star = char '*'
+
+plus :: Doc
+plus = char '+'
 
 data Term
-  = Srt Sort
-  | Var Sym
-  | Lam Sym Term Term
+  = Type
+  | Var (Name Term)
+  | Lam (Bind (Name Term, Embed Term) Term)
   | App Term Term
-  | Pi Sym Term Term
-  | Let Sym Term Term
-  | Decl Sym Term Term
+  | Pi (Bind (Name Term, Embed Term) Term)
+  | Let (Bind (Name Term, Embed Term) Term)
+  | Decl (Bind (Name Term, Embed Term) Term)
   | TypedPair Term Term Term
-  | Sigma Sym Term Term
+  | Sigma (Bind (Name Term, Embed Term) Term)
   | First Term
   | Second Term
   | InL Term Term
   | InR Term Term
   | Sum Term Term
-  | Case Term Sym Term Sym Term
+  | Case Term (Bind (Name Term) Term) (Bind (Name Term) Term)
   | Unit
   | UnitTy
-  deriving (Eq)
+  deriving (Show)
 
-instance Show Term where
-  show (Srt s) = show s
-  show (Var v) = v
-  show (Lam x t1 t2) = "(\\" ++ x ++ " : " ++ show t1 ++ ". " ++ show t2 ++ ")"
-  show (App t1 t2) = "(" ++ show t1 ++ " " ++ show t2 ++ ")"
-  show (Pi x t1 t2) = if x `elem` (freeVars t2)
-    then "(" ++ x ++ " : " ++ show t1 ++ ") -> " ++ show t2
-    else show t1 ++ " -> " ++ show t2
-  show (Let _ _ t) = show t
-  show (Decl _ _ t) = show t
-  show (TypedPair t1 t2 ty) = "(" ++ show t1 ++ " , " ++ show t2 ++ ":" ++ show ty ++ ")"
-  show (Sigma x t1 t2) = if x `elem` (freeVars t2)
-    then "(" ++ x ++ " : " ++ show t1 ++ " * " ++ show t2 ++ ")"
-    else "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
-  show (First t) = show t ++ ".1"
-  show (Second t) = show t ++ ".2"
-  show (InL t ty) = "inl " ++ show t ++ " : " ++ show ty
-  show (InR t ty) = "inr " ++ show t ++ " : " ++ show ty
-  show (Sum t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
-  show (Case s x1 t1 x2 t2) = "case " ++ show s ++ " of inl " ++ x1 ++ " -> " ++ show t1 ++ " | " ++ "inr " ++ x2 ++ " -> " ++ show t2
-  show (Unit) = "unit"
-  show (UnitTy) = "Unit"
+$(derive [''Term])
 
-freeVars :: Term -> [Sym]
-freeVars (Srt _) = []
-freeVars (Var x) = [x]
-freeVars (Lam x ty tm) = ((freeVars tm) \\ [x]) `union` (freeVars ty)
-freeVars (App lhs rhs) = (freeVars lhs) `union` (freeVars rhs)
-freeVars (Pi x lTy rTy) = ((freeVars rTy) \\ [x]) `union` (freeVars lTy)
-freeVars (Let x t1 t2) = ((freeVars t2) \\ [x]) `union` (freeVars t1)
-freeVars (Decl x t1 t2) = ((freeVars t2) \\ [x]) `union` (freeVars t1)
-freeVars (TypedPair t1 t2 ty) = freeVars t1 `union` freeVars t2 `union` freeVars ty
-freeVars (Sigma x t1 t2) = ((freeVars t2) \\ [x]) `union` (freeVars t1)
-freeVars (First t) = freeVars t
-freeVars (Second t) = freeVars t
-freeVars (InL t ty) = freeVars t `union` freeVars ty
-freeVars (InR t ty) = freeVars t `union` freeVars ty
-freeVars (Sum t1 t2) = freeVars t1 `union` freeVars t2
-freeVars (Case s x1 t1 x2 t2) = freeVars s `union` ((freeVars t1) \\ [x1]) `union` ((freeVars t2) \\ [x2])
-freeVars (Unit) = []
-freeVars (UnitTy) = []
+instance Alpha Term where
 
-data Sort
-  = Star
-  | Box
-  deriving (Eq)
+instance Subst Term Term where
+  isvar (Var v) = Just (SubstName v)
+  isvar _ = Nothing
 
-instance Show Sort where
-  show Star = "Type"
-  show Box = "[]"
+var :: String -> Term
+var = Var . string2Name
+
+lam :: String -> Term -> Term -> Term
+lam = binding Lam
+
+pi_ :: String -> Term -> Term -> Term
+pi_ = binding Pi
+
+let_ :: String -> Term -> Term -> Term
+let_ = binding Let
+
+decl :: String -> Term -> Term -> Term
+decl = binding Decl
+
+sigma :: String -> Term -> Term -> Term
+sigma = binding Sigma
+
+binding :: (Bind (Name Term, Embed Term) Term -> Term) -> String -> Term -> Term -> Term
+binding con x t1 t2 = con $ bind (string2Name x, embed t1) t2
+
+case_ :: Term -> String -> Term -> String -> Term -> Term
+case_ s x t y u = Case s (bind (string2Name x) t) (bind (string2Name y) u)
+
+
+class Pretty a where
+  pp :: LFresh m => a -> m Doc
+
+instance Pretty (Name a) where
+  pp = return . text . show
+
+instance Pretty Term where
+  pp (Type) = return $ text "Type"
+  pp (Var x) = pp x
+  pp (Lam b) = lunbind b $ \((x, Embed ty), tm) -> do
+    x' <- pp x
+    ty' <- pp ty
+    tm' <- pp tm
+    return $ parens $ slash <> x' <+> colon <+> ty' <> dot <+> tm'
+  pp (App t1 t2) = do
+    t1' <- pp t1
+    t2' <- pp t2
+    return $ parens $ t1' <+> t2'
+  pp (Pi b) = lunbind b $ \((x, Embed t1), t2) -> do
+    x' <- pp x
+    t1' <- pp t1
+    t2' <- pp t2
+    return $ (parens $ x' <+> colon <+> t1') <+> arrow <+> t2'
+  pp (Let b) = lunbind b $ \((x, Embed t1), t2) -> do
+    x' <- pp x
+    t1' <- pp t1
+    t2' <- pp t2
+    return $ (text "let") <+> x' <+> equals <+> t1' <+> (text "in") $$ t2'
+  pp (Decl b) = lunbind b $ \((x, Embed ty), tm) -> do
+    x' <- pp x
+    ty' <- pp ty
+    tm' <- pp tm
+    return $ (text "let") <+> x' <+> colon <+> ty' <+> (text "in") $$ tm'
+  pp (TypedPair t1 t2 ty) = do
+    t1' <- pp t1
+    t2' <- pp t2
+    ty' <- pp ty
+    return $ parens $ t1' <> comma <+> t2' <+> colon <+> ty'
+  pp (Sigma b) = lunbind b $ \((x, Embed t1), t2) -> do
+    x' <- pp x
+    t1' <- pp t1
+    t2' <- pp t2
+    return $ parens $ (parens $ x' <+> colon <+> t1') <+> star <+> t2'
+  pp (First t) = do
+    t' <- pp t
+    return $ t' <> dot <> (char '1')
+  pp (Second t) = do
+    t' <- pp t
+    return $ t' <> dot <> (char '2')
+  pp (InL tm ty) = do
+    tm' <- pp tm
+    ty' <- pp ty
+    return $ (text "inl") <+> tm' <+> colon <+> ty'
+  pp (InR tm ty) = do
+    tm' <- pp tm
+    ty' <- pp ty
+    return $ (text "inr") <+> tm' <+> colon <+> ty'
+  pp (Sum t1 t2) = do
+    t1' <- pp t1
+    t2' <- pp t2
+    return $ parens $ t1' <+> plus <+> t2'
+  pp (Case s b1 b2) = lunbind b1 $ \(x, t) -> lunbind b2 $ \(y, u) -> do
+    s' <- pp s
+    x' <- pp x
+    t' <- pp t
+    y' <- pp y
+    u' <- pp u
+    return $ (text "case") <+> s' <+> (text "of") <+>
+      (text "inl") <+> x' <+> arrow <+> t' <+> mid <+>
+      (text "inr") <+> y' <+> arrow <+> u'
+  pp (Unit) = return $ text "unit"
+  pp (UnitTy) = return $ text "Unit"
