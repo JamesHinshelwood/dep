@@ -20,6 +20,8 @@ tokens :-
     \.                              { \s -> TDot }
     \(                              { \s -> TLParen }
     \)                              { \s -> TRParen }
+    \[                              { \s -> TLBracket }
+    \]                              { \s -> TRBracket }
     "->"                            { \s -> TArrow }
     \=                              { \s -> TEquals }
     \,                              { \s -> TComma }
@@ -36,6 +38,7 @@ tokens :-
     "in"                            { \s -> TIn }
     "unit"                          { \s -> TUnit }
     "Unit"                          { \s -> TUnitUpper }
+    "refl"                          { \s -> TRefl }
     $alpha [$alpha $digit \_ \']*   { \s -> TVar s }
 
 {
@@ -45,6 +48,8 @@ data Token = TType
            | TDot
            | TLParen
            | TRParen
+           | TLBracket
+           | TRBracket
            | TArrow
            | TEquals
            | TComma
@@ -61,6 +66,7 @@ data Token = TType
            | TIn
            | TUnit
            | TUnitUpper
+           | TRefl
            | TVar String
            deriving (Eq, Show)
 

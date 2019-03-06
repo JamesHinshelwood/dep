@@ -18,6 +18,8 @@ import Lexer
     '.'     { TDot }
     '('     { TLParen }
     ')'     { TRParen }
+    '['     { TLBracket }
+    ']'     { TRBracket }
     '->'    { TArrow }
     '='     { TEquals }
     ','     { TComma }
@@ -34,6 +36,7 @@ import Lexer
     'in'    { TIn }
     'unit'  { TUnit }
     'Unit'  { TUnitUpper }
+    'refl'  { TRefl }
     var     { TVar $$ }
 
 %right '->'
@@ -57,6 +60,9 @@ Term : 'Type'                                                       { Type }
      | 'let' var ':' Term 'in' Term                                 { decl $2 $4 $6 }
      | 'unit'                                                       { Unit }
      | 'Unit'                                                       { UnitTy }
+     | '(' Term '=' Term ':' Term ')'                               { Eq $2 $4 $6 }
+     | '(' 'refl' ':' Term ')'                                      { Refl $4 }
+     | 'case' '[' Term ']' Term 'of' 'refl' '(' var ')' '->' Term   { split $3 $5 $9 $12 }
      | Fact                                                         { $1 }
 
 Fact : Fact Atom                                                    { App $1 $2 }

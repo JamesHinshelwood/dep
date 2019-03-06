@@ -10,10 +10,10 @@ module Syntax where
 
 import Prelude hiding ((<>))
 
-import Unbound.LocallyNameless
+import Unbound.LocallyNameless hiding (Refl)
 import Data.Set
 
-import Text.PrettyPrint (Doc, (<+>), (<>), text, colon, char, parens, ($$), comma)
+import Text.PrettyPrint (Doc, (<+>), (<>), text, colon, char, parens, ($$), comma, brackets)
 
 slash :: Doc
 slash = char '\\'
@@ -54,6 +54,9 @@ data Term
   | Case Term (Bind (Name Term) Term) (Bind (Name Term) Term)
   | Unit
   | UnitTy
+  | Eq Term Term Term
+  | Refl Term
+  | Split Term Term (Bind (Name Term) Term)
   deriving (Show)
 
 $(derive [''Term])
@@ -87,6 +90,9 @@ binding con x t1 t2 = con $ bind (string2Name x, embed t1) t2
 
 case_ :: Term -> String -> Term -> String -> Term -> Term
 case_ s x t y u = Case s (bind (string2Name x) t) (bind (string2Name y) u)
+
+split :: Term -> Term -> String -> Term -> Term
+split c p z t = Split c p (bind (string2Name z) t)
 
 
 class Pretty a where
@@ -163,3 +169,17 @@ instance Pretty Term where
       (text "inr") <+> y' <+> arrow <+> u'
   pp (Unit) = return $ text "unit"
   pp (UnitTy) = return $ text "Unit"
+  pp (Eq x y ty) = do
+    x' <- pp x
+    y' <- pp y
+    ty' <- pp ty
+    return $ parens $ x' <+> equals <+> y' <+> colon <+> ty'
+  pp (Refl ty) = do
+    ty' <- pp ty
+    return $ parens $ (text "refl") <+> colon <+> ty'
+  pp (Split c p b) = lunbind b $ \(z, t) -> do
+    c' <- pp c
+    p' <- pp p
+    z' <- pp z
+    t' <- pp t
+    return $ (text "case") <> (brackets c') <+> p' <+> (text "of") <+> (text "refl") <> (parens z') <+> arrow <+> t'
