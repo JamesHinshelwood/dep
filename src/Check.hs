@@ -1,9 +1,6 @@
 module Check where
 
 import Unbound.LocallyNameless hiding (Refl)
-import Data.Maybe
-import Data.Set
-import Control.Monad.Trans.Maybe
 import Syntax
 
 type Context = [(Name Term, Term)]
@@ -105,8 +102,8 @@ typeOf g (Case s b1 b2) = lunbind b1 $ \(x, t) -> lunbind b2 $ \(y, u) -> do
         then return tTy -- FIXME : which one should we return?
         else error "case branch types are different"
     _ -> error "case is not sum"
-typeOf g Unit = return UnitTy
-typeOf g UnitTy = return Type
+typeOf _ Unit = return UnitTy
+typeOf _ UnitTy = return Type
 typeOf g (Eq a b ty) = do
   checkType g ty
   aTy <- typeOf g a
@@ -114,9 +111,9 @@ typeOf g (Eq a b ty) = do
   if beq aTy ty && beq bTy ty
     then return Type
     else error "equal type is not well formed"
-typeOf g (Refl ann) = do
+typeOf _ (Refl ann) = do
   case ann of
-    Eq a b ty -> if beq a b
+    Eq a b _ -> if beq a b -- FIXME: Check a : T and b : T
       then return ann
       else error "refl on non-equal terms"
     _ -> error "refl has bad annotation"
@@ -126,10 +123,10 @@ typeOf g (Split c p b) = lunbind b $ \(z, t) -> do
     Eq m n a -> do
       cTy <- typeOf g c
       case cTy of
-        Pi b ->
-          lunbind b $ \((x, Embed a'), Pi b') ->
-          lunbind b' $ \((y, Embed a''), Pi b'') ->
-          lunbind b'' $ \((_, Embed (Eq (Var x') (Var y') a''')), ty) ->
+        Pi b' ->
+          lunbind b' $ \((x, Embed a'), Pi b'') ->
+          lunbind b'' $ \((y, Embed a''), Pi b''') ->
+          lunbind b''' $ \((_, Embed (Eq (Var x') (Var y') a''')), _) ->
           if x == x' && y == y' && beq a a' && beq a a'' && beq a a'''
             then do
               checkType g cTy
@@ -167,7 +164,7 @@ nf (Case s b1 b2) = do
       InL s'' _ -> return $ subst x s'' t
       InR s'' _ -> return $ subst y s'' u
       _ -> return $ Case s' b1 b2 -- FIXME: b1' b2'?
-nf (Split c (Refl (Eq x y ty)) b) = lunbind b $ \(z, t) -> do
+nf (Split _ (Refl (Eq x _ _)) b) = lunbind b $ \(_, t) -> do
   return (App t x)
 -- FIXME: Do we need eta-reduction?
 nf t = return t

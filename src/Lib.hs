@@ -2,9 +2,9 @@ module Lib
     ( repl
     ) where
 
-import Syntax
 import Check
 import Parser
+import Print
 
 import Unbound.LocallyNameless
 
