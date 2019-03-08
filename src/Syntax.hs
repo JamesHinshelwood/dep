@@ -22,10 +22,9 @@ data Term
   | Sigma (Bind (Name Term, Embed Term) Term)
   | First Term
   | Second Term
-  | InL Term Term
-  | InR Term Term
-  | Sum Term Term
-  | Case Term (Bind (Name Term) Term) (Bind (Name Term) Term)
+  | Variant String Term Term
+  | Sum [(String, Term)]
+  | Case Term [(String, Bind (Name Term) Term)]
   | Unit
   | UnitTy
   | Eq Term Term Term
@@ -62,8 +61,8 @@ sigma = binding Sigma
 binding :: (Bind (Name Term, Embed Term) Term -> Term) -> String -> Term -> Term -> Term
 binding con x t1 t2 = con $ bind (string2Name x, embed t1) t2
 
-case_ :: Term -> String -> Term -> String -> Term -> Term
-case_ s x t y u = Case s (bind (string2Name x) t) (bind (string2Name y) u)
+case_ :: Term -> [(String, String, Term)] -> Term
+case_ s l = Case s $ map (\(lbl, x, t) -> (lbl, bind (string2Name x) t)) l
 
 split :: Term -> Term -> String -> Term -> Term
 split c p z t = Split c p (bind (string2Name z) t)

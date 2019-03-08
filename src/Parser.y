@@ -26,8 +26,6 @@ import Lexer
     '*'     { TProduct }
     '.1'    { TFirst }
     '.2'    { TSecond }
-    'inl'   { TInL }
-    'inr'   { TInR }
     '+'     { TSum }
     '|'     { TBar }
     'case'  { TCase }
@@ -52,10 +50,9 @@ Term : 'Type'                                                       { Type }
      | '(' Term '*' Term ')'                                        { sigma "_" $2 $4 }
      | Term '.1'                                                    { First $1 }
      | Term '.2'                                                    { Second $1 }
-     | 'inl' Term ':' Term                                          { InL $2 $4 }
-     | 'inr' Term ':' Term                                          { InR $2 $4 }
-     | '(' Term '+' Term ')'                                        { Sum $2 $4 }
-     | 'case' Term 'of' 'inl' var '->' Term '|' 'inr' var '->' Term { case_ $2 $5 $7 $10 $12 }
+     | '(' var '(' Term ')' ':' Term ')'                            { Variant $2 $4 $7 }
+     | '(' Sum ')'                                                  { Sum $2 }
+     | 'case' Term 'of' Case                                        { case_ $2 $4 }
      | 'let' var '=' Term 'in' Term                                 { let_ $2 $4 $6 }
      | 'let' var ':' Term 'in' Term                                 { decl $2 $4 $6 }
      | 'unit'                                                       { Unit }
@@ -63,9 +60,15 @@ Term : 'Type'                                                       { Type }
      | '(' Term '=' Term ':' Term ')'                               { Eq $2 $4 $6 }
      | '(' 'refl' ':' Term ')'                                      { Refl $4 }
      | 'case' '[' Term ']' Term 'of' 'refl' '(' var ')' '->' Term   { split $3 $5 $9 $12 }
-     | Fact                                                         { $1 }
+     | Appl                                                         { $1 }
 
-Fact : Fact Atom                                                    { App $1 $2 }
+Sum  : var '(' Term ')'                                             { [($1, $3)] }
+     | var '(' Term ')' '+' Sum                                     { ($1, $3):$6 }
+
+Case : var '(' var ')' '->' Term                                    { [($1, $3, $6)] }
+     | var '(' var ')' '->' Term '|' Case                           { ($1, $3, $6):$8 }
+
+Appl : Appl Atom                                                    { App $1 $2 }
      | Atom                                                         { $1 }
 
 Atom : '(' Term ')'                                                 { $2 }

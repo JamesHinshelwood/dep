@@ -1,0 +1,6 @@
+let Option = \A : Type . (Some(A) + None(Unit)) in
+let A : Type in
+let a : A in
+let b : A in
+let val = (Some(a) : Option Type) in
+case val of Some(x) -> x | None(x) -> b

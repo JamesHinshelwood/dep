@@ -8,6 +8,10 @@ type Context = [(Name Term, Term)]
 addType :: Name Term -> Term -> Context -> Context
 addType x ty g = (x, ty) : g
 
+allEqual :: [Term] -> Bool
+allEqual [] = True
+allEqual (x:xs) = all (beq x) xs
+
 checkType :: Context -> Term -> LFreshM ()
 checkType g ty = do
   kind <- typeOf g ty
@@ -70,38 +74,28 @@ typeOf g (Second t) = do
     Sigma b -> lunbind b $ \((x, _), t2) -> do
       return (subst x (First t) t2)
     _ -> error "projection is not a pair"
-typeOf g (InL l ty) = do
-  case ty of
-    s@(Sum t1 _) -> do
-      checkType g s
-      lTy <- typeOf g l
-      if beq lTy t1
-        then return ty
-        else error "in annotation has wrong type"
-    _ -> error "in annotation is not sum"
-typeOf g (InR r ty) = do
-  case ty of
-    s@(Sum _ t2) -> do
-      checkType g s
-      rTy <- typeOf g r
-      if beq rTy t2
-        then return ty
-        else error "in annotation has wrong type"
-    _ -> error "in annotation is not sum"
-typeOf g (Sum t1 t2) = do
-  checkType g t1
-  checkType g t2
+typeOf g (Variant lbl tm s) = do
+  tmTy <- typeOf g tm
+  s' <- nf s -- FIXME: Discuss this problem, the application might not be well typed. Is it even a problem?
+  case s' of
+    Sum ts -> case lookup lbl ts of
+      Just ty -> if ty `beq` tmTy then return s' else error "variant has wrong type"
+      Nothing -> error "invalid variant in sum"
+    _ -> error "variant annotation is not sum"
+typeOf g (Sum s) = do
+  mapM (\(l, t) -> checkType g t) s
   return Type
-typeOf g (Case s b1 b2) = lunbind b1 $ \(x, t) -> lunbind b2 $ \(y, u) -> do
+typeOf g (Case s l) = do
   ty <- typeOf g s
   case ty of
-    Sum ty1 ty2 -> do
-      tTy <- typeOf (addType x ty1 g) t
-      uTy <- typeOf (addType y ty2 g) u
-      if beq tTy uTy
-        then return tTy -- FIXME : which one should we return?
-        else error "case branch types are different"
-    _ -> error "case is not sum"
+    Sum tys -> do
+      types <- mapM (\(lbl, b') -> lunbind b' $ \(x, t) -> case lookup lbl tys of
+        Just ty' -> typeOf (addType x ty' g) t
+        _ -> error "invalid variant in case branch") l
+      if allEqual types
+        then return $ head types
+        else error "case branches have different types"
+    _ -> error "case type is not a sum"
 typeOf _ Unit = return UnitTy
 typeOf _ UnitTy = return Type
 typeOf g (Eq a b ty) = do
@@ -157,13 +151,20 @@ nf (First p) = do
   case p of
     TypedPair _ t _ -> return t
     _ -> return $ First p'
-nf (Case s b1 b2) = do
+nf (Case v ts) = do
+  v' <- nf v
+  case v' of
+    Variant lbl t _ -> case lookup lbl ts of
+      Just b -> lunbind b $ \(x, tm) -> return $ subst x t tm
+      _ -> return $ Case v' ts
+    _ -> return $ Case v' ts
+{-nf (Case s b1 b2) = do
   s' <- nf s
   lunbind b1 $ \(x, t) -> lunbind b2 $ \(y, u) ->
     case s' of
       InL s'' _ -> return $ subst x s'' t
       InR s'' _ -> return $ subst y s'' u
-      _ -> return $ Case s' b1 b2 -- FIXME: b1' b2'?
+      _ -> return $ Case s' b1 b2 -- FIXME: b1' b2'?-}
 nf (Split _ (Refl (Eq x _ _)) b) = lunbind b $ \(_, t) -> do
   return (App t x)
 -- FIXME: Do we need eta-reduction?

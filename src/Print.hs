@@ -2,9 +2,10 @@ module Print where
 
 import Prelude hiding ((<>))
 import Syntax
-import Text.PrettyPrint (Doc, (<+>), (<>), text, colon, char, parens, ($$), comma, brackets)
+import Text.PrettyPrint (Doc, (<+>), (<>), text, colon, char, parens, ($$), comma, brackets, hsep)
 import Unbound.LocallyNameless hiding (Refl)
-import Data.Set
+import Data.Set hiding (map)
+import Data.List
 
 slash :: Doc
 slash = char '\\'
@@ -78,27 +79,20 @@ instance Pretty Term where
   pp (Second t) = do
     t' <- pp t
     return $ t' <> dot <> (char '2')
-  pp (InL tm ty) = do
-    tm' <- pp tm
-    ty' <- pp ty
-    return $ (text "inl") <+> tm' <+> colon <+> ty'
-  pp (InR tm ty) = do
-    tm' <- pp tm
-    ty' <- pp ty
-    return $ (text "inr") <+> tm' <+> colon <+> ty'
-  pp (Sum t1 t2) = do
-    t1' <- pp t1
-    t2' <- pp t2
-    return $ parens $ t1' <+> plus <+> t2'
-  pp (Case s b1 b2) = lunbind b1 $ \(x, t) -> lunbind b2 $ \(y, u) -> do
-    s' <- pp s
-    x' <- pp x
+  pp (Variant l t ty) = do
     t' <- pp t
-    y' <- pp y
-    u' <- pp u
-    return $ (text "case") <+> s' <+> (text "of") <+>
-      (text "inl") <+> x' <+> arrow <+> t' <+> mid <+>
-      (text "inr") <+> y' <+> arrow <+> u'
+    ty' <- pp ty
+    return $ (text l) <> (parens t') <+> colon <+> ty'
+  pp (Sum l) = do
+    l' <- mapM (\(x, t) -> ((text x) <>) <$> parens <$> (pp t)) l
+    return $ hsep $ intersperse plus l'
+  pp (Case s l) = do
+    s' <- pp s
+    l' <- mapM (\(lbl, b) -> lunbind b $ \(x, t) -> do
+      x' <- pp x
+      t' <- pp t
+      return $ (text lbl) <> (parens x') <+> arrow <+> t') l
+    return $ (text "case") <+> s' <+> (text "of") <+> (hsep $ intersperse mid l')
   pp (Unit) = return $ text "unit"
   pp (UnitTy) = return $ text "Unit"
   pp (Eq x y ty) = do
